@@ -18,7 +18,7 @@ def main():
     if len(sys.argv) > 2:
         n_points, m_points = sys.argv[:2]
     else:
-        n_points, m_points = 50, 3
+        n_points, m_points = 10, 10
 
     plotter = Plotter(FIGURE_X_SIZE, FIGURE_Y_SIZE)
     immutable_surface = get_points_surface(
@@ -29,10 +29,8 @@ def main():
         m_points, POINTS_MIN_POSITION, POINTS_MAX_POSITION)
     plotter.snap_mutable_surface(mutable_surface)
     sgd = SteepestGradientDescent(immutable_surface)
-    for _ in range(50):
-        mutable_surface = sgd.get_new_mutable_surface(mutable_surface)
-        plotter.snap_mutable_surface(mutable_surface)
-
+    for surface in sgd.get_new_mutable_surface(mutable_surface):
+        plotter.snap_mutable_surface(surface)
     plotter.save(DESTINATION)
 
 

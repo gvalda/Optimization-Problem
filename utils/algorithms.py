@@ -1,60 +1,82 @@
 from itertools import product, combinations
+from multiprocessing import Pool
 from models.surface import Surface
 from models.point import Point
 
 
 class SteepestGradientDescent:
-    def __init__(self, immutable_surface=None, ds=0.01, h=0.01):
+    def __init__(self, immutable_surface=None, ds=0.01, h=0.01, accuracy=0.01):
         self._ds = ds
         self._h = h
+        self._accuracy = accuracy
         self._immutable_surface = immutable_surface
 
     def set_immutable_surface(self, surface):
         self._immutable_surface = surface
 
     def get_new_mutable_surface(self, surface):
-        new_surface = Surface()
-        psi = self._get_psi(surface)
-        print(psi)
-        for point in surface:
-            new_point = self._get_new_point(
-                point, psi, surface)
-            new_surface.add_point(new_point)
-        return new_surface
+        while True:
+            new_surface = Surface()
+            psi = self._get_psi(surface)
+            print(psi)
+            if not hasattr(self, '_vectors'):
+                self._vectors = []
+            for idx, point in enumerate(surface):
+                if len(self._vectors) == idx:
+                    vector = self._get_gradient(point, psi, surface)
+                    self._vectors.append(vector)
+                else:
+                    vector = self._vectors[idx]
+                new_point = self._get_new_point(point, vector)
+                if self._should_recalculate(psi, surface, point, new_point):
+                    vector = self._get_gradient(point, psi, surface)
+                    self._vectors[idx] = vector
+                    new_point = self._get_new_point(point, vector)
+                new_surface.add_point(new_point)
+            yield new_surface
+            new_psi = self._get_psi(new_surface)
+            if abs(psi - new_psi)/new_psi*100 < self._accuracy:
+                break
+            surface = new_surface
 
-    def _get_new_point(self, point, psi, mut_surf):
-        new_x = self._get_new_x_value(point, psi, mut_surf)
-        new_y = self._get_new_y_value(point, psi, mut_surf)
+    def _get_new_point(self, point, vector):
+        vector_x, vector_y = vector
+        new_x = self._calculate_new_value(point.x, vector_x)
+        new_y = self._calculate_new_value(point.y, vector_y)
         new_point = Point(new_x, new_y)
         return new_point
 
-    def _get_new_x_value(self, point, psi, mut_surf):
+    def _get_gradient(self, point, psi, mut_surf):
+        vector_x = self._get_x_gradient(point, psi, mut_surf)
+        vector_y = self._get_y_gradient(point, psi, mut_surf)
+        return vector_x, vector_y
+
+    def _get_x_gradient(self, point, psi, mut_surf):
         point_with_x_shift = Point(point.x+self._h, point.y)
         new_surface = self._get_surface_with_replaced_point(
             mut_surf, point, point_with_x_shift)
-        vector_x = self._get_gradient(
-            psi, new_surface)
-        new_x = self._calculate_new_value(point.x, vector_x)
-        return new_x
+        shift_psi = self._get_psi(new_surface)
+        vector = (shift_psi - psi) / self._h
+        return vector
 
-    def _get_new_y_value(self, point, psi, mut_surf):
+    def _get_y_gradient(self, point, psi, mut_surf):
         point_with_y_shift = Point(point.x, point.y+self._h)
         new_surface = self._get_surface_with_replaced_point(
             mut_surf, point, point_with_y_shift)
-        vector_y = self._get_gradient(
-            psi, new_surface)
-        new_y = self._calculate_new_value(point.y, vector_y)
-        return new_y
+        shift_psi = self._get_psi(new_surface)
+        vector = (shift_psi - psi) / self._h
+        return vector
+
+    def _should_recalculate(self, psi, surface, point, new_point):
+        replaced_surface = self._get_surface_with_replaced_point(
+            surface, point, new_point)
+        new_psi = self._get_psi(replaced_surface)
+        return new_psi > psi
 
     def _get_surface_with_replaced_point(self, surface, old_point, new_point):
         new_surface = surface[:]
         new_surface.replace(old_point, new_point)
         return new_surface
-
-    def _get_gradient(self, psi, mut_surf):
-        shift_psi = self._get_psi(mut_surf)
-        vector = (shift_psi - psi) / self._h
-        return vector
 
     def _calculate_new_value(self, value, vector):
         return value - self._ds * vector
@@ -63,15 +85,15 @@ class SteepestGradientDescent:
         psi = 0
         immut_surf = self._immutable_surface
         avg = self._get_avg_value(mut_surf, immut_surf)
-        for mut_point in mut_surf:
-            for immut_point in immut_surf:
-                psi += (mut_point.length_to(immut_point) -
-                        avg)**2
-        for index, mut_point1 in enumerate(mut_surf):
-            for mut_point2 in mut_surf[index:]:
-                if mut_point1 is not mut_point2:
-                    psi += (mut_point1.length_to(mut_point2) -
-                            avg)**2
+        for mut_point, immut_point in product(mut_surf, immut_surf):
+            psi += (mut_point.length_to(immut_point) - avg)**2
+
+        for mut_point1, mut_point2 in combinations(mut_surf, 2):
+            psi += (mut_point1.length_to(mut_point2)-avg)**2
+
+        for immut_point1, immut_point2 in combinations(immut_surf, 2):
+            psi += (immut_point1.length_to(immut_point2)-avg)**2
+
         return psi
 
     def _get_avg_value(self, mut_surf, immut_surf):
