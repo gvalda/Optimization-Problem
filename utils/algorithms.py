@@ -1,46 +1,41 @@
-from itertools import product, combinations
 from multiprocessing import Pool
+from itertools import product, combinations, combinations_with_replacement
+from functools import partial
+from statistics import mean
+
 from models.surface import Surface
 from models.point import Point
 
 
-class SteepestGradientDescent:
+class GradientDescentOptimization:
     def __init__(self, immutable_surface=None, ds=0.01, h=0.01, accuracy=0.005):
         self._ds = ds
         self._h = h
         self._accuracy = accuracy
         self._immutable_surface = immutable_surface
 
-    def set_immutable_surface(self, surface):
-        self._immutable_surface = surface
-
-    def get_new_mutable_surface(self, surface):
+    def get_new_mutable_surfaces(self, surface):
         while True:
-            new_surface = Surface()
             psi = self._get_psi(surface)
             print(psi)
-            if not hasattr(self, '_vectors'):
-                self._vectors = []
-            for idx, point in enumerate(surface):
-                if len(self._vectors) == idx:
-                    vector = self._get_gradient(point, psi, surface)
-                    self._vectors.append(vector)
-                else:
-                    vector = self._vectors[idx]
-                new_point = self._get_new_point(point, vector)
-                if self._should_recalculate(psi, surface, point, new_point):
-                    vector = self._get_gradient(point, psi, surface)
-                    self._vectors[idx] = vector
-                    new_point = self._get_new_point(point, vector)
-                new_surface.add_point(new_point)
+            get_new_point_m = partial(
+                self._get_new_point, psi=psi, surface=surface)
+            with Pool() as p:
+                new_points = p.map(get_new_point_m, surface)
+            new_surface = Surface(new_points)
+            # new_surface = Surface()
+            # for point in surface:
+            #     new_point = get_new_point_m(point)
+            #     new_surface.add_point(new_point)
+            print(1)
             yield new_surface, psi
             new_psi = self._get_psi(new_surface)
             if abs(psi - new_psi)/new_psi*100 < self._accuracy:
                 break
             surface = new_surface
 
-    def _get_new_point(self, point, vector):
-        vector_x, vector_y = vector
+    def _get_new_point(self, point, psi, surface):
+        vector_x, vector_y = self._get_gradient(point, psi, surface)
         new_x = self._calculate_new_value(point.x, vector_x)
         new_y = self._calculate_new_value(point.y, vector_y)
         new_point = Point(new_x, new_y)

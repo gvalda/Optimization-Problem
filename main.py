@@ -3,7 +3,7 @@ from models.surface import Surface
 from models.point import Point
 from utils.random import generate_n_points
 from utils.plotter import Plotter
-from utils.algorithms import SteepestGradientDescent
+from utils.algorithms import *
 
 FIGURE_X_SIZE = (-12, 12)
 FIGURE_Y_SIZE = (-12, 12)
@@ -18,7 +18,7 @@ def main():
     if len(sys.argv) > 2:
         n_points, m_points = sys.argv[:2]
     else:
-        n_points, m_points = 10, 10
+        n_points, m_points = 50, 50
 
     plotter = Plotter(FIGURE_X_SIZE, FIGURE_Y_SIZE)
     immutable_surface = get_points_surface(
@@ -28,8 +28,8 @@ def main():
     mutable_surface = get_points_surface(
         m_points, POINTS_MIN_POSITION, POINTS_MAX_POSITION)
     plotter.snap_mutable_surface(mutable_surface)
-    sgd = SteepestGradientDescent(immutable_surface)
-    for surface, psi in sgd.get_new_mutable_surface(mutable_surface):
+    sgd = GradientDescentOptimization(immutable_surface)
+    for surface, psi in sgd.get_new_mutable_surfaces(mutable_surface):
         plotter.snap_mutable_surface(surface, psi)
     plotter.save(DESTINATION)
 
