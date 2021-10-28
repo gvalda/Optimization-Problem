@@ -5,7 +5,7 @@ from models.point import Point
 
 
 class SteepestGradientDescent:
-    def __init__(self, immutable_surface=None, ds=0.01, h=0.01, accuracy=0.01):
+    def __init__(self, immutable_surface=None, ds=0.01, h=0.01, accuracy=0.005):
         self._ds = ds
         self._h = h
         self._accuracy = accuracy
@@ -33,7 +33,7 @@ class SteepestGradientDescent:
                     self._vectors[idx] = vector
                     new_point = self._get_new_point(point, vector)
                 new_surface.add_point(new_point)
-            yield new_surface
+            yield new_surface, psi
             new_psi = self._get_psi(new_surface)
             if abs(psi - new_psi)/new_psi*100 < self._accuracy:
                 break

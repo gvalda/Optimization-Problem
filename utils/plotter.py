@@ -12,11 +12,12 @@ class Plotter:
     def set_immutable_surface(self, surface):
         self._immutable_surface = surface
 
-    def snap_mutable_surface(self, surface):
+    def snap_mutable_surface(self, surface, psi=9999):
         self._set_mutable_surface(surface)
         self._scatter_immutable_surface()
         self._scatter_mutable_surface()
         self._build_lines_between()
+        self._draw_title(psi)
         self._snap_with_camera()
 
     def _set_mutable_surface(self, surface):
@@ -64,9 +65,13 @@ class Plotter:
         self._ax.plot([point1.x, point2.x], [
                       point1.y, point2.y], c=color, zorder=-1, alpha=0.5)
 
+    def _draw_title(self, text):
+        self._ax.text(0.4, 1.01, f'f= {text:.2f}',
+                      transform=self._ax.transAxes)
+
     def _snap_with_camera(self):
         self._camera.snap()
 
     def save(self, destination):
-        animation = self._camera.animate()
+        animation = self._camera.animate(interval=1/30)
         animation.save(destination, writer='imagemagick')

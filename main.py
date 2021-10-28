@@ -29,8 +29,8 @@ def main():
         m_points, POINTS_MIN_POSITION, POINTS_MAX_POSITION)
     plotter.snap_mutable_surface(mutable_surface)
     sgd = SteepestGradientDescent(immutable_surface)
-    for surface in sgd.get_new_mutable_surface(mutable_surface):
-        plotter.snap_mutable_surface(surface)
+    for surface, psi in sgd.get_new_mutable_surface(mutable_surface):
+        plotter.snap_mutable_surface(surface, psi)
     plotter.save(DESTINATION)
 
 
