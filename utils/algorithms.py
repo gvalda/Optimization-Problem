@@ -1,33 +1,31 @@
 from multiprocessing import Pool
-from itertools import product, combinations, combinations_with_replacement
+from itertools import product, combinations
 from functools import partial
-from statistics import mean
 
 from models.surface import Surface
 from models.point import Point
 
 
 class GradientDescentOptimization:
-    def __init__(self, immutable_surface=None, ds=0.01, h=0.01, accuracy=0.005):
+    def __init__(self, immutable_surface=None, ds=0.01, h=0.01, accuracy=0.005, threads_num=None):
         self._ds = ds
         self._h = h
         self._accuracy = accuracy
         self._immutable_surface = immutable_surface
+        self._threads_num = threads_num
 
     def get_new_mutable_surfaces(self, surface):
         while True:
             psi = self._get_psi(surface)
-            print(psi)
             get_new_point_m = partial(
                 self._get_new_point, psi=psi, surface=surface)
-            with Pool() as p:
+            with Pool(self._threads_num) as p:
                 new_points = p.map(get_new_point_m, surface)
             new_surface = Surface(new_points)
             # new_surface = Surface()
             # for point in surface:
             #     new_point = get_new_point_m(point)
             #     new_surface.add_point(new_point)
-            print(1)
             yield new_surface, psi
             new_psi = self._get_psi(new_surface)
             if abs(psi - new_psi)/new_psi*100 < self._accuracy:

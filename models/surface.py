@@ -31,5 +31,6 @@ class Surface:
 
     def replace(self, cur_point, new_point):
         for idx, point in enumerate(self._points):
-            if point == cur_point:
+            if point is cur_point:
                 self._points[idx] = new_point
+                break
