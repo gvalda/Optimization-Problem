@@ -16,12 +16,9 @@ class Surface:
     def __len__(self):
         return len(self._points)
 
-    def __str__(self):
+    def __repr__(self):
         points_str = ' ,\n'.join(str(point) for point in self._points)
         return f'<{self.__class__.__name__} object: \n{points_str}>'
-
-    def set_points(self, points):
-        self._points = points
 
     def add_point(self, point):
         self._points.append(point)

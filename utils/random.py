@@ -1,5 +1,6 @@
 from random import random
 from models.point import Point
+from models.surface import Surface
 
 
 def randfloat(start, stop):
@@ -19,3 +20,9 @@ def generate_n_points(n, start, stop):
         p = generate_point(start, stop)
         points.append(p)
     return points
+
+
+def generate_surface(points_num, start, stop):
+    points = generate_n_points(points_num, start, stop)
+    surface = Surface(points)
+    return surface

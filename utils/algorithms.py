@@ -1,70 +1,69 @@
 from multiprocessing import Pool
 from itertools import product, combinations
-from functools import partial
-
 from models.surface import Surface
 from models.point import Point
+import tqdm
+
+
+def check_threads_quantity(quantity):
+    if quantity < 1:
+        raise Exception('Quantity of threads cannot be less than 1')
 
 
 class GradientDescentOptimization:
-    def __init__(self, immutable_surface=None, ds=0.01, h=0.01, accuracy=0.005, threads_num=None):
+    def __init__(self, immutable_surface=None, mutable_surface=None, ds=0.0001, h=0.01, accuracy=0.005, threads_quantity=1):
         self._ds = ds
         self._h = h
         self._accuracy = accuracy
         self._immutable_surface = immutable_surface
-        self._threads_num = threads_num
+        self._mutable_surface = mutable_surface
+        self._threads_quantity = threads_quantity
 
-    def get_new_mutable_surfaces(self, surface):
+    def __call__(self, surface=None):
+        if surface:
+            self._mutable_surface = surface
+        if not hasattr(self, '_mutable_surface') or not self._mutable_surface:
+            return
+        self._mutable_surface_psi = self._get_psi(self._mutable_surface)
         while True:
-            psi = self._get_psi(surface)
-            get_new_point_m = partial(
-                self._get_new_point, psi=psi, surface=surface)
-            with Pool(self._threads_num) as p:
-                new_points = p.map(get_new_point_m, surface)
+            new_points = []
+            check_threads_quantity(self._threads_quantity)
+            with Pool(self._threads_quantity) as p:
+                for point in tqdm.tqdm(p.imap_unordered(self._get_new_point, self._mutable_surface), total=len(self._mutable_surface)):
+                    new_points.append(point)
             new_surface = Surface(new_points)
-            # new_surface = Surface()
-            # for point in surface:
-            #     new_point = get_new_point_m(point)
-            #     new_surface.add_point(new_point)
-            yield new_surface, psi
             new_psi = self._get_psi(new_surface)
-            if abs(psi - new_psi)/new_psi*100 < self._accuracy:
+            yield new_surface, new_psi
+            if abs(self._mutable_surface_psi - new_psi)/new_psi*100 < self._accuracy:
                 break
-            surface = new_surface
+            self._mutable_surface = new_surface
+            self._mutable_surface_psi = new_psi
 
-    def _get_new_point(self, point, psi, surface):
-        vector_x, vector_y = self._get_gradient(point, psi, surface)
+    def _get_new_point(self, point):
+        x_shifted_point = self._get_x_shifted_point(point)
+        vector_x = self._get_gradient(point, x_shifted_point)
         new_x = self._calculate_new_value(point.x, vector_x)
+
+        y_shifted_point = self._get_y_shifted_point(point)
+        vector_y = self._get_gradient(point, y_shifted_point)
         new_y = self._calculate_new_value(point.y, vector_y)
+
         new_point = Point(new_x, new_y)
         return new_point
 
-    def _get_gradient(self, point, psi, mut_surf):
-        vector_x = self._get_x_gradient(point, psi, mut_surf)
-        vector_y = self._get_y_gradient(point, psi, mut_surf)
-        return vector_x, vector_y
+    def _get_x_shifted_point(self, point):
+        return Point(point.x + self._h, point.y)
 
-    def _get_x_gradient(self, point, psi, mut_surf):
-        point_with_x_shift = Point(point.x+self._h, point.y)
+    def _get_y_shifted_point(self, point):
+        return Point(point.x, point.y + self._h)
+
+    def _get_gradient(self, point, shifted_point):
+        muttable_surface = self._mutable_surface
         new_surface = self._get_surface_with_replaced_point(
-            mut_surf, point, point_with_x_shift)
+            muttable_surface, point, shifted_point)
         shift_psi = self._get_psi(new_surface)
-        vector = (shift_psi - psi) / self._h
+        vector = (shift_psi - self._mutable_surface_psi) / self._h
         return vector
-
-    def _get_y_gradient(self, point, psi, mut_surf):
-        point_with_y_shift = Point(point.x, point.y+self._h)
-        new_surface = self._get_surface_with_replaced_point(
-            mut_surf, point, point_with_y_shift)
-        shift_psi = self._get_psi(new_surface)
-        vector = (shift_psi - psi) / self._h
-        return vector
-
-    def _should_recalculate(self, psi, surface, point, new_point):
-        replaced_surface = self._get_surface_with_replaced_point(
-            surface, point, new_point)
-        new_psi = self._get_psi(replaced_surface)
-        return new_psi > psi
 
     def _get_surface_with_replaced_point(self, surface, old_point, new_point):
         new_surface = surface[:]
@@ -92,13 +91,14 @@ class GradientDescentOptimization:
     def _get_avg_value(self, mut_surf, immut_surf):
         total_length = 0
         count = 0
-        for mut_point in mut_surf:
-            for immut_point in immut_surf:
-                total_length += mut_point.length_to(immut_point)
-                count += 1
+        for mut_point, immut_point in product(mut_surf, immut_surf):
+            total_length += mut_point.length_to(immut_point)
+            count += 1
+
         for point1, point2 in combinations(mut_surf, 2):
             total_length += point1.length_to(point2)
             count += 1
+
         for point1, point2 in combinations(immut_surf, 2):
             total_length += point1.length_to(point2)
             count += 1

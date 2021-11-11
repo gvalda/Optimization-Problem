@@ -1,45 +1,76 @@
 import sys
-from time import time
-from models.surface import Surface
 from models.point import Point
-from utils.random import generate_n_points
+from models.surface import Surface
+from config import RESULTS_PATH_TEMPLATE
+from utils.analyse import analyze_all, analyze_one
+from utils.jsonIO import read_json, write_json
 from utils.algorithms import *
+from utils.dataset import read_all_datasets, read_dataset
+from utils.table_builder import build_table
 
-POINTS_MAX_POSITION = 10
-POINTS_MIN_POSITION = -10
 
-N_POINTS = 100
-M_POINTS = 100
+def get_start_arguments():
+    return sys.argv[1:]
 
-THREADS_NUMBER = 16
+
+def make_points_surface_from_dict(dict):
+    surface = Surface([Point(**point) for point in dict])
+    return surface
+
+
+def split_dataset_into_surfaces(dataset):
+    immutable_surface = make_points_surface_from_dict(
+        dataset['immutable-points'])
+    mutable_surface = make_points_surface_from_dict(dataset['mutable-points'])
+    return immutable_surface, mutable_surface
+
+
+def analyze_one_dataset(argv):
+    if len(argv) < 3:
+        raise Exception('Not enough paramenters for specified mode')
+    dataset_number, threads_quantity = (int(arg) for arg in argv[1:3])
+    dataset = read_dataset(dataset_number)
+    immutable_surface, mutable_surface = split_dataset_into_surfaces(dataset)
+    gdo = GradientDescentOptimization(
+        immutable_surface, mutable_surface, threads_quantity=threads_quantity)
+    analyze_one(gdo())
+
+
+def analyze_everything():
+    datasets = read_all_datasets()
+    data = ((num, split_dataset_into_surfaces(dataset))
+            for num, dataset in datasets)
+    for step_durations, dataset_number, dataset_size, threads_quantity in analyze_all(data, GradientDescentOptimization, 10):
+        print(f'Dataset number: {dataset_number}')
+        print(f'Threads quantity: {threads_quantity}')
+        print(f'Total time: {sum(step_durations)}')
+        print(build_table(['Time elapsed'], [[step]
+                                             for step in step_durations], row_numbers=True))
+        result_dict = {
+            'dataset': dataset_number,
+            'size': dataset_size,
+            'threads-quantity': threads_quantity,
+            'measured-results': step_durations,
+        }
+        write_json(RESULTS_PATH_TEMPLATE(
+            dataset_number, threads_quantity), result_dict)
+
+
+def analyze_results():
+    pass
 
 
 def main():
-    if len(sys.argv) > 2:
-        n_points, m_points, n_threads = (int(p) for p in sys.argv[1:4])
-    else:
-        n_points, m_points, n_threads = N_POINTS, M_POINTS, THREADS_NUMBER
-
-    immutable_surface = get_points_surface(
-        n_points, POINTS_MIN_POSITION, POINTS_MAX_POSITION)
-
-    mutable_surface = get_points_surface(
-        m_points, POINTS_MIN_POSITION, POINTS_MAX_POSITION)
-    gdo = GradientDescentOptimization(immutable_surface, threads_num=n_threads)
-
-    start = time()
-    prev_step = start
-    for surface, psi in gdo.get_new_mutable_surfaces(mutable_surface):
-        step = time()
-        print(f'Elapsed since start { step-start:.3f}s')
-        print(f'Elapsed since previous iteration {step-prev_step:.3f}s')
-        prev_step = step
-
-
-def get_points_surface(points_num, start, stop):
-    points = generate_n_points(points_num, start, stop)
-    surface = Surface(points)
-    return surface
+    argv = get_start_arguments()
+    if len(argv) < 1:
+        raise Exception('Not enough parameters to choose execution mode')
+    mode = int(argv[0])
+    if mode == 0:
+        analyze_one_dataset(argv)
+    elif mode == 1:
+        analyze_everything()
+    elif mode == 2:
+        analyze_results()
 
 
 if __name__ == '__main__':
