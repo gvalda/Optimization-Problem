@@ -1,12 +1,16 @@
 import sys
+from statistics import mean
 from models.point import Point
 from models.surface import Surface
 from config import RESULTS_PATH_TEMPLATE
 from utils.analyse import analyze_all, analyze_one
+from utils.graph import plot_series, save_ax
 from utils.jsonIO import read_json, write_json
 from utils.algorithms import *
-from utils.dataset import read_all_datasets, read_dataset
+from utils.data_manager import read_all_datasets, read_dataset, read_all_results
 from utils.table_builder import build_table
+import pandas as pd
+import numpy as np
 
 
 def get_start_arguments():
@@ -57,7 +61,24 @@ def analyze_everything():
 
 
 def analyze_results():
-    pass
+    results = read_all_results()
+    df = pd.DataFrame(results)
+    df = df.sort_values(['dataset', 'threads-quantity'])
+
+    df['MEAN'] = df.apply(lambda row: mean(row['measured-results']), axis=1)
+    threads_q_by_dataset = df.pivot_table(
+        index='threads-quantity', columns='dataset', values='MEAN')
+    for dataset, row in threads_q_by_dataset.iteritems():
+        plot_series(f'dataset-{dataset}', row, ylabel='Time, s')
+    ax = threads_q_by_dataset.plot(ylabel='Time, s', figsize=(
+        20, 10), xticks=threads_q_by_dataset.index)
+    save_ax('cumulative_graphs_by_threads', ax)
+
+    size_by_threads_q = df.pivot_table(
+        index='size', columns='threads-quantity', values='MEAN')
+    ax = size_by_threads_q.plot(ylabel='Time, s', figsize=(
+        20, 10), xticks=size_by_threads_q.index)
+    save_ax('cumulative_graphs_by_size', ax)
 
 
 def main():
