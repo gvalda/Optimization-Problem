@@ -11,13 +11,14 @@ def check_threads_quantity(quantity):
 
 
 class GradientDescentOptimization:
-    def __init__(self, immutable_surface=None, mutable_surface=None, ds=0.0001, h=0.01, accuracy=0.005, threads_quantity=1):
+    def __init__(self, immutable_surface=None, mutable_surface=None, ds=0.0001, h=0.01, accuracy=0.005, threads_quantity=1, show_PSI=True):
         self._ds = ds
         self._h = h
         self._accuracy = accuracy
         self._immutable_surface = immutable_surface
         self._mutable_surface = mutable_surface
         self._threads_quantity = threads_quantity
+        self._show_PSI = show_PSI
 
     def __call__(self, surface=None):
         if surface:
@@ -33,6 +34,8 @@ class GradientDescentOptimization:
                     new_points.append(point)
             new_surface = Surface(new_points)
             new_psi = self._get_psi(new_surface)
+            if self._show_PSI:
+                print(f'PSI: {new_psi}')
             yield new_surface, new_psi
             if abs(self._mutable_surface_psi - new_psi)/new_psi*100 < self._accuracy:
                 break

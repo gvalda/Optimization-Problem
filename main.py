@@ -4,7 +4,7 @@ from models.point import Point
 from models.surface import Surface
 from config import RESULTS_PATH_TEMPLATE
 from utils.analyse import analyze_all, analyze_one
-from utils.graph import plot_series, save_ax
+from utils.graph import plot_pivot_table, plot_series, save_ax
 from utils.jsonIO import read_json, write_json
 from utils.algorithms import *
 from utils.data_manager import read_all_datasets, read_dataset, read_all_results
@@ -29,6 +29,17 @@ def split_dataset_into_surfaces(dataset):
     return immutable_surface, mutable_surface
 
 
+def display_result(dataset_number, threads_quantity, step_durations):
+    print(f'Dataset number: {dataset_number}')
+    print(f'Threads quantity: {threads_quantity}')
+    print(build_table(['Time elapsed'], [[step]
+                                         for step in step_durations], row_numbers=True))
+    total_time = sum(step_durations)
+    average_time = total_time / len(step_durations)
+    print(f'Total time: {total_time}')
+    print(f'Average time: {average_time}')
+
+
 def analyze_one_dataset(argv):
     if len(argv) < 3:
         raise Exception('Not enough paramenters for specified mode')
@@ -37,7 +48,8 @@ def analyze_one_dataset(argv):
     immutable_surface, mutable_surface = split_dataset_into_surfaces(dataset)
     gdo = GradientDescentOptimization(
         immutable_surface, mutable_surface, threads_quantity=threads_quantity)
-    analyze_one(gdo())
+    step_durations = analyze_one(gdo())
+    display_result(dataset_number, threads_quantity, step_durations)
 
 
 def analyze_everything():
@@ -45,11 +57,7 @@ def analyze_everything():
     data = ((num, split_dataset_into_surfaces(dataset))
             for num, dataset in datasets)
     for step_durations, dataset_number, dataset_size, threads_quantity in analyze_all(data, GradientDescentOptimization, 10):
-        print(f'Dataset number: {dataset_number}')
-        print(f'Threads quantity: {threads_quantity}')
-        print(f'Total time: {sum(step_durations)}')
-        print(build_table(['Time elapsed'], [[step]
-                                             for step in step_durations], row_numbers=True))
+        display_result(dataset_number, threads_quantity, step_durations)
         result_dict = {
             'dataset': dataset_number,
             'size': dataset_size,
@@ -65,20 +73,17 @@ def analyze_results():
     df = pd.DataFrame(results)
     df = df.sort_values(['dataset', 'threads-quantity'])
 
-    df['MEAN'] = df.apply(lambda row: mean(row['measured-results']), axis=1)
+    df['Mean'] = df.apply(lambda row: mean(row['measured-results']), axis=1)
     threads_q_by_dataset = df.pivot_table(
-        index='threads-quantity', columns='dataset', values='MEAN')
+        index='threads-quantity', columns='dataset', values='Mean')
     for dataset, row in threads_q_by_dataset.iteritems():
         plot_series(f'dataset-{dataset}', row, ylabel='Time, s')
-    ax = threads_q_by_dataset.plot(ylabel='Time, s', figsize=(
-        20, 10), xticks=threads_q_by_dataset.index)
-    save_ax('cumulative_graphs_by_threads', ax)
-
+    plot_pivot_table('cumulative_graphs_by_threads',
+                     threads_q_by_dataset, 'Time, s')
     size_by_threads_q = df.pivot_table(
-        index='size', columns='threads-quantity', values='MEAN')
-    ax = size_by_threads_q.plot(ylabel='Time, s', figsize=(
-        20, 10), xticks=size_by_threads_q.index)
-    save_ax('cumulative_graphs_by_size', ax)
+        index='size', columns='threads-quantity', values='Mean')
+    plot_pivot_table('cumulative_graphs_by_size', size_by_threads_q, 'Time, s')
+    print('Graphs are build!')
 
 
 def main():
