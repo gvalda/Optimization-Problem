@@ -1,7 +1,7 @@
 import multiprocessing
 from time import time
 
-LOGICAL_CORES = multiprocessing.cpu_count()
+from config import MAX_THREADS
 
 
 def analyze_one(iterable, iterations=10):
@@ -22,7 +22,7 @@ def analyze_all(data, analyzedClass, iterations=10):
     for num, ds in data:
         ds = list(ds)
         ds_size = len(ds[0])*2
-        for threads_quantity in range(1, LOGICAL_CORES+1, 3):
+        for threads_quantity in range(1, MAX_THREADS, 3):
             step_durations = []
             while True:
                 analyzedObject = analyzedClass(

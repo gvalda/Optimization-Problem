@@ -26,21 +26,21 @@ class GradientDescentOptimization:
         if not hasattr(self, '_mutable_surface') or not self._mutable_surface:
             return
         self._mutable_surface_psi = self._get_psi(self._mutable_surface)
-        while True:
-            new_points = []
-            check_threads_quantity(self._threads_quantity)
-            with Pool(self._threads_quantity) as p:
-                for point in tqdm.tqdm(p.imap_unordered(self._get_new_point, self._mutable_surface), total=len(self._mutable_surface)):
+        with Pool(self._threads_quantity) as p:
+            while True:
+                new_points = []
+                check_threads_quantity(self._threads_quantity)
+                for point in tqdm.tqdm(p.map(self._get_new_point, self._mutable_surface), total=len(self._mutable_surface)):
                     new_points.append(point)
-            new_surface = Surface(new_points)
-            new_psi = self._get_psi(new_surface)
-            if self._show_PSI:
-                print(f'PSI: {new_psi}')
-            yield new_surface, new_psi
-            if abs(self._mutable_surface_psi - new_psi)/new_psi*100 < self._accuracy:
-                break
-            self._mutable_surface = new_surface
-            self._mutable_surface_psi = new_psi
+                new_surface = Surface(new_points)
+                new_psi = self._get_psi(new_surface)
+                if self._show_PSI:
+                    print(f'PSI: {new_psi}')
+                yield new_surface, new_psi
+                if abs(self._mutable_surface_psi - new_psi)/new_psi*100 < self._accuracy:
+                    break
+                self._mutable_surface = new_surface
+                self._mutable_surface_psi = new_psi
 
     def _get_new_point(self, point):
         x_shifted_point = self._get_x_shifted_point(point)
